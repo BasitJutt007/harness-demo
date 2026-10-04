@@ -175,3 +175,32 @@ describe('PATCH /v1/projects/:projectId', () => {
     expect(second.body).toEqual(first.body);
   });
 });
+
+
+describe('project deletion and status filtering', () => {
+  it('deletes a project with 204, then returns 404, and rejects repeat and malformed deletes', async () => {
+    const project = await createProject();
+    const deleted = await request(app).delete(`/v1/projects/${project.id}`);
+    expect(deleted.status).toBe(204);
+    expect(deleted.text).toBe('');
+    expectProblem(await request(app).get(`/v1/projects/${project.id}`), 404);
+    expectProblem(await request(app).delete(`/v1/projects/${project.id}`), 404);
+    expectProblem(await request(app).delete('/v1/projects/not-a-uuid'), 422);
+  });
+
+  it('filters archived and active projects, including cursor pagination', async () => {
+    const archived = await createProject({ status: 'archived' });
+    const active = await createProject({ status: 'active' });
+    await createProject({ status: 'archived' });
+    const archivedIds = await listAll({ status: 'archived', limit: '1' });
+    expect(archivedIds).toContain(archived.id);
+    expect(archivedIds).not.toContain(active.id);
+    const activeIds = await listAll({ status: 'active', limit: '1' });
+    expect(activeIds).toContain(active.id);
+    expect(activeIds).not.toContain(archived.id);
+  });
+
+  it('rejects an unknown status query value', async () => {
+    expectProblem(await request(app).get('/v1/projects').query({ status: 'deleted' }), 422);
+  });
+});

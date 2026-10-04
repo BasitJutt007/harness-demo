@@ -31,7 +31,7 @@ export const UpdateProjectSchema = z
   .refine((patch) => Object.keys(patch).length > 0, { message: 'at least one field is required' });
 export type UpdateProject = z.infer<typeof UpdateProjectSchema>;
 
-export const ListProjectsQuerySchema = CursorQuerySchema;
+export const ListProjectsQuerySchema = CursorQuerySchema.extend({ status: ProjectStatusSchema.optional() });
 export type ListProjectsQuery = z.infer<typeof ListProjectsQuerySchema>;
 
 export const ProjectPageSchema = pageSchema(ProjectSchema);
