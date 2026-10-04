@@ -175,3 +175,42 @@ describe('PATCH /v1/projects/:projectId', () => {
     expect(second.body).toEqual(first.body);
   });
 });
+
+
+describe('project deletion and status filtering', () => {
+  it('deletes a project with 204 and then returns 404', async () => {
+    const project = await createProject();
+    const deleted = await request(app).delete(`/v1/projects/${project.id}`);
+    expect(deleted.status).toBe(204);
+    expect(deleted.text).toBe('');
+    expectProblem(await request(app).get(`/v1/projects/${project.id}`), 404);
+  });
+
+  it('returns problem 404 for missing and repeated deletes', async () => {
+    expectProblem(await request(app).delete(`/v1/projects/${UNKNOWN_ID}`), 404);
+    const project = await createProject();
+    await request(app).delete(`/v1/projects/${project.id}`).expect(204);
+    expectProblem(await request(app).delete(`/v1/projects/${project.id}`), 404);
+  });
+
+  it('rejects malformed delete ids', async () => {
+    expectProblem(await request(app).delete('/v1/projects/not-a-uuid'), 422);
+  });
+
+  it('filters by status and paginates the filtered set', async () => {
+    const active = await createProject({ status: 'active' });
+    const archived = await createProject({ status: 'archived' });
+    await createProject({ status: 'archived' });
+    const archivedIds = await listAll({ status: 'archived', limit: '1' });
+    expect(archivedIds).toContain(archived.id);
+    expect(archivedIds).not.toContain(active.id);
+    expect(new Set(archivedIds).size).toBe(archivedIds.length);
+    const activeIds = await listAll({ status: 'active', limit: '1' });
+    expect(activeIds).toContain(active.id);
+    expect(activeIds).not.toContain(archived.id);
+  });
+
+  it('rejects an unknown status filter', async () => {
+    expectProblem(await request(app).get('/v1/projects').query({ status: 'deleted' }), 422);
+  });
+});
